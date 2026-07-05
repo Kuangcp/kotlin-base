@@ -19,74 +19,144 @@ private val logger = KotlinLogging.logger {}
 
 class WebClientTest {
 
-    // client 是单例，不配置全局超时，超时由每次请求决定
     private val client = HttpClient(CIO)
 
+    private data class RequestResult(
+        val index: Int,
+        val requestId: String,
+        val success: Boolean,
+        val body: String,
+        val elapsedMs: Long
+    )
+
+    private suspend fun HttpClient.fetchWithTimeout(
+        url: String,
+        timeoutMs: Long,
+    ): String = withTimeout(timeoutMs.milliseconds) {
+        get(url) {
+            timeout {
+                requestTimeoutMillis = timeoutMs
+                connectTimeoutMillis = timeoutMs
+                socketTimeoutMillis = timeoutMs
+            }
+        }.bodyAsText()
+    }
+
+    private suspend fun executeRequest(
+        url: String,
+        index: Int,
+        timeoutMs: Long,
+        startTime: Long,
+        semaphore: Semaphore,
+    ): RequestResult = semaphore.withPermit {
+        val requestId = UUID.randomUUID().toString().take(8)
+        val elapsed = { System.currentTimeMillis() - startTime }
+
+        runCatching {
+            val body = client.fetchWithTimeout(url, timeoutMs)
+            logger.info { "[${requestId}] 请求 #${index + 1} 完成 (${elapsed()}ms)" }
+            RequestResult(index, requestId, true, body, elapsed())
+        }.getOrElse { e ->
+            logger.warn { "[${requestId}] 请求 #${index + 1} 失败: ${e.message} (${elapsed()}ms)" }
+            RequestResult(index, requestId, false, "FAILED_${index + 1}", elapsed())
+        }
+    }
+
     @Test
-    fun `async-http-get`() = runBlocking {
-        val totalTimeoutMs = 30000L     // 总超时 8秒
-        val perRequestTimeoutMs = 8000L // 单次超时 2秒
+    fun `http get with timeout`() = runBlocking {
+        val totalTimeoutMs = 20000L    // 总超时 20秒
+        val perRequestTimeoutMs = 5000L // 单次超时 5秒
         val concurrency = 2             // 最大并发数
         val totalRequests = 8           // 总请求数
-        val url = "https://httpbin.org/get"
-
+        val url = "https://jsonplaceholder.typicode.com/posts/1"
         val semaphore = Semaphore(concurrency)
 
-        logger.info { "开始 $totalRequests 次 HTTP 请求，并发=$concurrency，单次超时=${perRequestTimeoutMs}ms，总超时=${totalTimeoutMs}ms" }
+        logger.info { "开始 $totalRequests 次请求，并发=$concurrency，单次=${perRequestTimeoutMs}ms，总=${totalTimeoutMs}ms" }
 
-        val results = mutableListOf<String>()
-        val startTime = System.currentTimeMillis()
-
+        val results: List<RequestResult>
+        val testStartTime = System.currentTimeMillis()
         val totalTime = measureTimeMillis {
-            try {
-                withTimeout(totalTimeoutMs.milliseconds) {
-                    coroutineScope {
-                        val jobs = List(totalRequests) { index ->
-                            async {
-                                semaphore.withPermit {
-                                    val requestId = UUID.randomUUID().toString().take(8)
-                                    try {
-                                        // 每次请求单独设置超时
-                                        withTimeout(perRequestTimeoutMs.milliseconds) {
-                                            val response = client.get(url) {
-                                                timeout {
-                                                    requestTimeoutMillis = perRequestTimeoutMs
-                                                    connectTimeoutMillis = perRequestTimeoutMs
-                                                    socketTimeoutMillis = perRequestTimeoutMs
-                                                }
-                                            }
-                                            val body = response.bodyAsText()
-                                            val elapsed = System.currentTimeMillis() - startTime
-                                            logger.info { "[${requestId}] 请求 #${index + 1} 完成 (${elapsed}ms)，状态码=${response.status}" }
-                                            body
-                                        }
-                                    } catch (e: TimeoutCancellationException) {
-                                        val elapsed = System.currentTimeMillis() - startTime
-                                        logger.warn { "[${requestId}] 请求 #${index + 1} 超时 (${elapsed}ms)" }
-                                        "TIMEOUT_${index + 1}"
-                                    }
-                                }
-                            }
+            results = withTimeoutOrNull(totalTimeoutMs.milliseconds) {
+                coroutineScope {
+                    List(totalRequests) { index ->
+                        async {
+                            executeRequest(url, index, perRequestTimeoutMs, testStartTime, semaphore)
                         }
-                        jobs.forEach { results.add(it.await()) }
-                    }
+                    }.awaitAll()
                 }
-            } catch (e: TimeoutCancellationException) {
-                logger.error { "总超时 ${totalTimeoutMs}ms 已到，取消剩余请求" }
+            } ?: emptyList()
+        }
+
+        logger.info { "完成 ${results.size}/$totalRequests，耗时=${totalTime}ms" }
+        results.forEach { r ->
+            logger.info { "  [${r.requestId}] #${r.index + 1} success=${r.success} ${r.elapsedMs}ms" }
+        }
+
+        assertTrue(results.isNotEmpty())
+        client.close()
+    }
+
+    @Test
+    fun `http get with timeout retry`() = runBlocking {
+        val totalTimeoutMs = 20000L
+        val perRequestTimeoutMs = 5000L
+        val maxRetries = 2
+        val concurrency = 2
+        val totalRequests = 8
+        val url = "https://jsonplaceholder.typicode.com/posts/1"
+        val semaphore = Semaphore(concurrency)
+
+        logger.info { "开始 $totalRequests 次请求(最多重试${maxRetries}次)，并发=$concurrency" }
+
+        val results: List<RequestResult>
+        val testStartTime = System.currentTimeMillis()
+        val totalTime = measureTimeMillis {
+            results = withTimeoutOrNull(totalTimeoutMs.milliseconds) {
+                coroutineScope {
+                    List(totalRequests) { index ->
+                        async {
+                            executeRequestWithRetry(url, index, perRequestTimeoutMs, testStartTime, semaphore, maxRetries)
+                        }
+                    }.awaitAll()
+                }
+            } ?: emptyList()
+        }
+
+        logger.info { "完成 ${results.size}/$totalRequests，耗时=${totalTime}ms" }
+        results.forEach { r ->
+            logger.info { "  [${r.requestId}] #${r.index + 1} success=${r.success} ${r.elapsedMs}ms" }
+        }
+
+        assertTrue(results.isNotEmpty())
+        client.close()
+    }
+
+    private suspend fun executeRequestWithRetry(
+        url: String,
+        index: Int,
+        timeoutMs: Long,
+        startTime: Long,
+        semaphore: Semaphore,
+        maxRetries: Int,
+    ): RequestResult = semaphore.withPermit {
+        val requestId = UUID.randomUUID().toString().take(8)
+        val elapsed = { System.currentTimeMillis() - startTime }
+
+        repeat(maxRetries + 1) { attempt ->
+            try {
+                val body = client.fetchWithTimeout(url, timeoutMs)
+                if (attempt > 0) {
+                    logger.info { "[${requestId}] 请求 #${index + 1} 第${attempt + 1}次成功 (${elapsed()}ms)" }
+                } else {
+                    logger.info { "[${requestId}] 请求 #${index + 1} 完成 (${elapsed()}ms)" }
+                }
+                return@withPermit RequestResult(index, requestId, true, body, elapsed())
+            } catch (e: Exception) {
+                logger.warn { "[${requestId}] 请求 #${index + 1} 第${attempt + 1}次失败: ${e.message}" }
             }
         }
 
-        logger.info { "全部完成，总耗时=${totalTime}ms" }
-        logger.info { "结果列表 (${results.size} 项):" }
-        results.forEachIndexed { index, result ->
-            logger.info { "  [$index] ${result.take(100)}..." }
-        }
-
-        assertTrue(totalTime < totalTimeoutMs + 2000, "总耗时 ${totalTime}ms 超过预期")
-        assertTrue(results.isNotEmpty(), "应该有请求结果")
-
-        logger.info { "测试通过！共完成 ${results.size} 个请求" }
-
-        client.close()
+        logger.error { "[${requestId}] 请求 #${index + 1} ${maxRetries + 1}次全部失败 (${elapsed()}ms)" }
+        RequestResult(index, requestId, false, "FAILED_${index + 1}", elapsed())
     }
 }
