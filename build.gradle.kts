@@ -16,6 +16,10 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.2")
     implementation(kotlin("reflect"))
+
+    // Logging
+    implementation("io.github.oshai:kotlin-logging-jvm:7.0.0")
+    implementation("ch.qos.logback:logback-classic:1.5.16")
 }
 
 tasks.test {

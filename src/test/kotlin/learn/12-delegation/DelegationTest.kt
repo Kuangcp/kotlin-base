@@ -1,5 +1,6 @@
 package learn.delegation
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Test
 import kotlin.properties.Delegates.observable
@@ -8,6 +9,8 @@ import kotlin.properties.ReadOnlyProperty
 import kotlin.properties.ReadWriteProperty
 import kotlin.reflect.KProperty
 import kotlin.test.assertEquals
+
+private val logger = KotlinLogging.logger {}
 
 class DelegationTest {
 

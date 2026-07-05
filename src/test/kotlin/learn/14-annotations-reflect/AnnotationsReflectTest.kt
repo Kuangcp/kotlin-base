@@ -1,9 +1,12 @@
 package learn.annotations
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.Test
 import kotlin.reflect.full.*
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+private val logger = KotlinLogging.logger {}
 
 // ==================== 自定义注解 ====================
 

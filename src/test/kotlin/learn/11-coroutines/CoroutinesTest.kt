@@ -1,5 +1,6 @@
 package learn.coroutines
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
 import kotlinx.coroutines.flow.*
@@ -11,6 +12,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+
+private val logger = KotlinLogging.logger {}
 
 class CoroutinesTest {
 
@@ -30,9 +33,9 @@ class CoroutinesTest {
     // ==================== suspend ====================
 
     private suspend fun fetchData(): String {
-        println("start fetchData ..." + Date())
+        logger.info { "start fetchData ... " }
         delay(3.seconds)
-        println("end fetchData ..." + Date())
+        logger.info { "end fetchData ... " }
         return "data"
     }
 

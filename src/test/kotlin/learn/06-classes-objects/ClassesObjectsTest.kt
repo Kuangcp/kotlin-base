@@ -1,7 +1,10 @@
 package learn.classes
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
+
+private val logger = KotlinLogging.logger {}
 
 sealed class Result {
     data class Success(val data: String) : Result()

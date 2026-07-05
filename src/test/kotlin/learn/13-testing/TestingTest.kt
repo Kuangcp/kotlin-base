@@ -1,5 +1,6 @@
 package learn.testing
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.function.Executable
@@ -8,6 +9,8 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.MethodSource
 import org.junit.jupiter.params.provider.Arguments
 import java.util.stream.Stream
+
+private val logger = KotlinLogging.logger {}
 
 class TestingTest {
 

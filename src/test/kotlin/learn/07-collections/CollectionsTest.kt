@@ -1,8 +1,11 @@
 package learn.collections
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+private val logger = KotlinLogging.logger {}
 
 class CollectionsTest {
 
@@ -223,16 +226,16 @@ class CollectionsTest {
     fun `sequence vs eager`() {
         // Eager: 每步创建中间集合
         val eager = listOf(1, 2, 3, 4, 5)
-            .filter { println("filter $it"); it > 2 }
-            .map { println("map $it"); it * 2 }
-        println("--- eager ---")
+            .filter { logger.debug { "filter $it" }; it > 2 }
+            .map { logger.debug { "map $it" }; it * 2 }
+        logger.debug { "--- eager ---" }
 
         // Lazy: 逐个处理
         val lazy = listOf(1, 2, 3, 4, 5).asSequence()
-            .filter { println("filter $it"); it > 2 }
-            .map { println("map $it"); it * 2 }
+            .filter { logger.debug { "filter $it" }; it > 2 }
+            .map { logger.debug { "map $it" }; it * 2 }
             .toList()
-        println("--- lazy ---")
+        logger.debug { "--- lazy ---" }
 
         assertEquals(eager, lazy)
     }

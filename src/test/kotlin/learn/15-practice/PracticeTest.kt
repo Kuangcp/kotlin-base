@@ -1,8 +1,11 @@
 package learn.practice
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+
+private val logger = KotlinLogging.logger {}
 
 class PracticeTest {
 
