@@ -1,5 +1,6 @@
 plugins {
-    kotlin("jvm") version "1.9.23"
+    kotlin("jvm") version "2.1.0"
+    application
 }
 
 group = "com.github.kuangcp"
@@ -11,12 +12,18 @@ repositories {
 
 dependencies {
     testImplementation(kotlin("test"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
 }
 
 tasks.test {
     useJUnitPlatform()
 }
+
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
+}
+
+tasks.register<JavaExec>("runCoroutines") {
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.github.kuangcp.coroutines.GuideDemoKt")
 }
