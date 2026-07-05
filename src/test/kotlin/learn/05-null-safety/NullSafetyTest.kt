@@ -87,7 +87,7 @@ class NullSafetyTest {
     @Test
     fun `non-null assertion throws`() {
         val name: String? = null
-        assertFailsWith<KotlinNullPointerException> {
+        assertFailsWith<NullPointerException> {
             name!!.length
         }
     }
