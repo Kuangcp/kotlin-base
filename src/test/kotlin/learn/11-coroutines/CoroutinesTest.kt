@@ -6,8 +6,11 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Test
+import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 class CoroutinesTest {
 
@@ -17,24 +20,44 @@ class CoroutinesTest {
     fun `runBlocking basics`() = runTest {
         var result = ""
         launch {
-            delay(10)
+            delay(10.milliseconds)
             result = "done"
         }
-        delay(20)
+        delay(20.milliseconds)
         assertEquals("done", result)
     }
 
     // ==================== suspend ====================
 
     private suspend fun fetchData(): String {
-        delay(10)
+        println("start fetchData ..." + Date())
+        delay(3.seconds)
+        println("end fetchData ..." + Date())
         return "data"
     }
 
     @Test
-    fun `suspend function`() = runTest {
+    fun `suspend function with real delay`() = runBlocking {
+        val start = System.currentTimeMillis()
         val data = fetchData()
+        val elapsed = System.currentTimeMillis() - start
+
         assertEquals("data", data)
+        assertTrue(elapsed >= 2900) // 至少等了约 3 秒
+    }
+
+    // 因为用了 runTest。runTest 使用 TestDispatcher，虚拟时间会跳过所有 delay，所以 3 秒的 delay 瞬间完成，日志时间差几乎为 0。
+    //     这是协程测试库的设计 —— 让测试快速执行，不等待真实时间。
+    //     如果你想要看到真实的 3 秒延迟，需要用 runBlocking
+    @Test
+    fun `suspend function with runTest`() = runTest {
+        val start = System.currentTimeMillis()
+        val data = fetchData()
+        val elapsed = System.currentTimeMillis() - start
+
+        assertEquals("data", data)
+        // runTest 跳过 delay，几乎不耗时
+        assertTrue(elapsed < 1000)
     }
 
     // ==================== launch ====================
