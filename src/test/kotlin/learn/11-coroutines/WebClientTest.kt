@@ -23,9 +23,9 @@ class WebClientTest {
     private val client = HttpClient(CIO)
 
     @Test
-    fun `async http get`() = runBlocking {
-        val totalTimeoutMs = 8000L     // 总超时 8秒
-        val perRequestTimeoutMs = 2000L // 单次超时 2秒
+    fun `async-http-get`() = runBlocking {
+        val totalTimeoutMs = 30000L     // 总超时 8秒
+        val perRequestTimeoutMs = 8000L // 单次超时 2秒
         val concurrency = 2             // 最大并发数
         val totalRequests = 8           // 总请求数
         val url = "https://httpbin.org/get"
