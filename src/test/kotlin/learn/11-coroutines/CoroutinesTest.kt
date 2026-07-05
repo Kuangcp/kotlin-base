@@ -7,7 +7,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.*
 import kotlinx.coroutines.test.*
 import org.junit.jupiter.api.Test
-import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
@@ -146,11 +145,12 @@ class CoroutinesTest {
     fun `job cancel`() = runTest {
         val job = launch {
             repeat(1000) { i ->
-                delay(10)
+                delay(100.milliseconds)
                 yield()
+                logger.info { "run ${i}" }
             }
         }
-        delay(5)
+        delay(3.seconds)
         job.cancel()
         assertTrue(job.isCancelled)
     }
